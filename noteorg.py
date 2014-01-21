@@ -1,7 +1,7 @@
 #coding=utf-8
-## @package pharser
+## @package noteorg
 #  
-#  \brief NoteOrganizer the file header
+#  \brief Note Organizer the file header
 #
 #  ### The file header follows this format
 #
@@ -215,6 +215,11 @@ class NoteDB():
             path = raw_input(">> Input the path of md files: ")
             self.__createDB(filename)
             self.extendDB(path)
+            
+    ## destructor of NoteDB class
+    def __del__(self):
+        self.conn.close()
+        
     ##
     # create a empty database        
     # \param filename file name of the database
@@ -268,7 +273,7 @@ def main():
     a=NoteDB("test.db")
     #a.extendDB("./")
     a.fetchDB()
-    a.conn.close()
+    
 
 if __name__=="__main__":
     main()
