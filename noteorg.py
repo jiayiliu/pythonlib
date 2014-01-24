@@ -1,4 +1,4 @@
-#coding=utf-8
+# -*- coding: utf-8 -*-
 ## @package noteorg
 #  
 #  \brief Note Organizer the file header
@@ -30,13 +30,17 @@
 #  
 #  *table* 
 
-from os.path import isfile
-from sys import exit
+from os.path import isfile,abspath,basename,getmtime
+import sys
 import sqlite3 as sql
 import glob
 import re
 
 from systools import *
+
+# set for python 2.7 version
+reload(sys)
+sys.setdefaultencoding("UTF-8")
 
 ##
 #  \brief Class for markdown file note
@@ -47,10 +51,15 @@ class Note:
     # \brief Initialization code
     # \param filename name string of a file to load-in
     # \param fulltext if set, then create the Note from input text
-    def __init__(self,filename,fulltext=[]):
+    def __init__(self,path,filename,fulltext=[]):
         try:
-            ## Filename of the Note 
+            ## Filename of the Note
             self.filename = filename
+            ## Path to Note
+            self.path = path
+            #if self.path[-1]!='/':
+            #    self.path = str.append(self.path,'/')
+            filename = self.path+self.filename
             if len(fulltext) == 0: # create new Note from file
                 # !!! Exam file existency !!! #
                 if not isfile(filename):
@@ -177,13 +186,17 @@ class Note:
                 f.write(self.returnHeader()+content)
         except Exception as inst:
             warning(inst.args[0])
-            exit(1)
+            sys.exit(1)
         return
     ##
     # \fn forDB()
     # \brief return the tuple for database input
     def forDB(self):
-        return (self.filename,'a','b','c','d','e','f')
+        return [unicode(x) for x in [
+            self.filename, self.path, self.author,
+            self.dateCreate, self.dateChange
+            ]]
+               
 
 ## 
 # \class IndexPage
@@ -197,6 +210,17 @@ class IndexPage:
 # \class NoteDB
 # \brief interface of database
 # \date 2014-01-20
+#
+#  headDB - store file header
+#  contentDB -store note content
+#  tagDB - store file tags
+#  ctagDB - store chinese tags
+#
+#  main function:
+#     import(): import a new path into database (no file conflict checking)
+#     update(): update a path which contains files already in database
+#     getFileByTag():  get file names by tag
+#     getContent(): get file content by file name
 class NoteDB():
     ## 
     # initialize the NoteDB class
@@ -206,19 +230,21 @@ class NoteDB():
         if isfile(filename):
             ## SQL connector
             self.conn = sql.connect(filename)
+            self.conn.text_factory = str
             ## SQL cursor
             self.cur = self.conn.cursor() 
         else:
             s = raw_input(">> Create a database '%s'? [n]/y: "%filename)
             if s != 'y':
-                exit(0)
+                sys.exit(1)
             path = raw_input(">> Input the path of md files: ")
             self.__createDB(filename)
-            self.extendDB(path)
-            
+            self.__importDB(path)
+
     ## destructor of NoteDB class
     def __del__(self):
-        self.conn.close()
+        if hasattr( self, "conn"):
+            self.conn.close()
         
     ##
     # create a empty database        
@@ -227,54 +253,137 @@ class NoteDB():
     def __createDB(self,filename):
         self.conn = sql.connect(filename)
         c = self.conn.cursor()
-        c.execute(''' CREATE TABLE noteDB
-        (filename text PRIMARY KEY,
+        c.execute(''' CREATE TABLE headDB
+        (
+        fid INTEGER PRIMARY KEY,
+        filename text,
+        path text,
         author text,
         date_create text,
         date_change text,
-        tags text,
-        ctags text,
-        content text
+        sys_modified text,
+        UNIQUE (filename,path)
         )
         ''')
-        self.conn.commit()
+        c.execute(''' CREATE TABLE tagDB
+        (
+        tid INTEGER,
+        tag text,
+        UNIQUE (tid, tag)
+        )
+        ''')
+        c.execute(''' CREATE TABLE ctagDB
+        (
+        ctid INTEGER,
+        tag text,
+        UNIQUE (ctid, tag)
+        )
+        ''')
         self.cur = c
 
     ##
     # expend the current database by given path
     # \param path path to md files
-    # \todo 中文支持
     # need to expend to full path
-    def extendDB(self,path):
-        files = glob.glob(path+"/*.md")
+    def __importDB(self,path):
+        path = abspath(path)+'/' # extend to full path
+        files = glob.glob(path+"*.md")
         for ifile in files:
             try:
+                modifyTime = getmtime(ifile)
+                ifile = basename(ifile)
                 print "- Insert "+ifile
-                inote = Note(ifile)
-                self.cur.execute("INSERT INTO noteDB VALUES (?,?,?,?,?,?,?)",
-                                 inote.forDB())
-                self.conn.commit()
+                inote = Note(path,ifile)
+                self.__insertNote(inote,modifyTime=modifyTime)
             except Exception as inst:
                 if (len(inst.args) == 2) and (inst.args[0]=="NoteClass"): # read-in fail
                     warning(inst.args[1])
                 else: # other problems
                     raise inst
+        self.conn.commit()
+
+    ##
+    # insert a Note Class
+    """
+    self.cur.execute("SELECT FID FROM headDB WHERE filename == ? AND path == ?",
+    (unicode(note.filename),unicode(note.path)))
+    fid = self.cur.fetchall()[0][0]
+    print fid
+    """
+    def __insertNote(self,note,modifyTime="EMPTY"):
+        
+        self.cur.execute('''INSERT INTO
+        headDB (filename,path,author,date_create,date_change,sys_modified)
+        VALUES (?,?,?,?,?,?)''',
+        [unicode(x) for x in [
+            note.filename, note.path, note.author,
+            note.dateCreate, note.dateChange, modifyTime
+            ]]
+        )
+
+        self.cur.execute(" SELECT last_insert_rowid();")
+        print self.cur.fetchall()
+        
+        '''for itag in note.tags:
+            self.cur.execute("INSERT INTO tagDB VALUES (?, ?)",fid,itag)
+        for itag in note.ctags:
+            self.cur.execute("INSERT INTO ctagDB VALUES (?, ?)",fid,unicode(itag))
+        '''
+    ##
+    # update a Note Class
+    #!!!!!!!!!! Pending !!!!!!!!!!!!
+    def __updateNote(self,fid,note):
+        #self.cur.execute('''UPDATE INTO
+        #noteDB (filename,path,author,date_create,date_change,content)
+        #VALUES (?,?,?,?,?,?)''',
+        #note.forDB())
+        pass
+    ##
+    # update the database
+    def updateDB(self,path):
+        path = abspath(path)+'/' # extend to full path
+        files = glob.glob(path+"*.md")
+        for ifile in files:
+            try:
+                ifile = basename(ifile)
+                inote = Note(path,ifile)
+                print inote.filename
+                self.cur.execute("SELECT FID FROM headDB WHERE filename == ? AND path == ?",
+                                    (unicode(inote.filename),unicode(inote.path)))
+                s = self.cur.fetchall()
+                if (s):
+                    fid = s[0][0]
+                    print "- Update "+ifile
+                    self.__updateNote(fid,inote)
+                else:
+                    print "- Insert "+ifile                        
+                    self.__insertNote(inote)
+            except Exception as inst:
+                if (len(inst.args) == 2) and (inst.args[0]=="NoteClass"): # read-in fail
+                    warning(inst.args[1])
+                else: # other problems
+                    raise inst
+        self.conn.commit()
+        
     ##
     # fetch the content from DB            
-    def fetchDB(self):
-        self.cur.execute("SELECT * FROM noteDB")
-        print self.cur.fetchall()
-              
+    def fetchNoteName(self):
+        self.cur.execute("SELECT filename FROM headDB")
+        return self.cur.fetchall()
+          
 ##
 # \fn main()
 # for testing
 def main():
-    #Note("test.md")
-    a=NoteDB("test.db")
-    #a.extendDB("./")
-    a.fetchDB()
-    
+    #a = Note("./","rules.md")
+    #s = a.forDB()
 
+    a=NoteDB("test.db")
+    s = a.fetchNoteName()
+    for i in s:
+        print i[0]
+    a.updateDB("./")
+    
 if __name__=="__main__":
     main()
 
