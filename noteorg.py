@@ -35,6 +35,7 @@ import sys
 import sqlite3 as sql
 import glob
 import re
+from time import localtime, strftime,strptime
 
 from systools import *
 
@@ -68,9 +69,9 @@ class Note:
                 ## Author of the Note 
                 self.author = "EMPTY"
                 ## Create Date of the Note
-                self.dateCreate = "EMPTY"
+                self.dateCreate = None
                 ## Create Date of the Note
-                self.dateChange = "EMPTY"
+                self.dateChange = None
                 ## Tags for the Note
                 self.tags = []
                 ## Tags for the Note (Chinese)
@@ -91,12 +92,15 @@ class Note:
             self.phraseContent(fulltext)
         except Exception as inst:
             warning("!!Note"+inst.args[0])
-            raise Exception("NoteClass","!!Fail to initialize %s"%self.filename)
+            if inst.args[0][:2] == "!!":
+                raise Exception("NoteClass","!!Fail to initialize Note class from %s"%self.filename)
+            else:
+                raise
     ##
     # \brief phrase the whole content
     def phraseContent(self,fulltext):
         if fulltext[0].strip(NEWLINE) != "<!--":
-            raise Exception("!! Fail to recognize header as \n %s"
+            raise Exception("!! Fail to recognize header from: %s"
                             %fulltext[0].strip(NEWLINE))
         finishFlag = False
         for ii,line in enumerate(fulltext[1:]):
@@ -138,9 +142,15 @@ class Note:
         if name.lower() == "author": 
             self.author = content
         if name.lower() == "date created":
-            self.dateCreate = content
+            if content == "":
+                self.dateCreate = localtime()
+            else:
+                self.dateCreate = strptime(content,"%d %b %Y")
         if name.lower() == "date changed":
-            self.dateChange = content
+            if content == "":
+                self.dateChange = self.dateCreate
+            else:
+                self.dateChange = strptime(content,"%d %b %Y")
         if name.lower() == "tags":
             self.__populateTagArray(content)
         if name.lower() == "标签":
@@ -168,8 +178,8 @@ class Note:
     def returnHeader(self):
         str = "<!--\n" + \
             "+Author: %s"%self.author + NEWLINE + \
-            "+Date Created: %s"%self.dateCreate + NEWLINE + \
-            "+Date Changed: %s"%self.dateChange + NEWLINE + \
+            "+Date Created: %s"%strftime("%d %b %Y",self.dateCreate) + NEWLINE + \
+            "+Date Changed: %s"%strftime("%d %b %Y",self.dateChange) + NEWLINE + \
             "+Tags: %s"%";".join(self.tags) + NEWLINE + \
             "+标签: %s"%";".join(self.ctags) + NEWLINE + \
             "-->\n"
@@ -183,10 +193,11 @@ class Note:
             if isfile(filename):
                 raise Exception("!! File (%s)Exist; Stop to overwrite !!"%filename)
             with open(filename,'w') as f:
-                f.write(self.returnHeader()+content)
+                f.write(self.returnHeader()+self.content)
         except Exception as inst:
             warning(inst.args[0])
-            sys.exit(1)
+            raise
+            #sys.exit(1)
         return
     ##
     # \fn forDB()
@@ -290,7 +301,7 @@ class NoteDB():
         files = glob.glob(path+"*.md")
         for ifile in files:
             try:
-                modifyTime = getmtime(ifile)
+                modifyTime = localtime(getmtime(ifile))
                 ifile = basename(ifile)
                 print "- Insert "+ifile
                 inote = Note(path,ifile)
@@ -299,30 +310,37 @@ class NoteDB():
                 if (len(inst.args) == 2) and (inst.args[0]=="NoteClass"): # read-in fail
                     warning(inst.args[1])
                 else: # other problems
-                    raise inst
+                    raise
         self.conn.commit()
 
     ##
     # insert a Note Class
+    # \param note a Note Class
+    # \param modifyTime time structure of file modification time
     """
     self.cur.execute("SELECT FID FROM headDB WHERE filename == ? AND path == ?",
     (unicode(note.filename),unicode(note.path)))
     fid = self.cur.fetchall()[0][0]
     print fid
     """
-    def __insertNote(self,note,modifyTime="EMPTY"):
+    def __insertNote(self,note,modifyTime=None):
+        if modifyTime is None:
+            modifyTime = localtime()
+        modifyTime = strftime("%Y-%m-%d %H:%M:%S",modifyTime)
         
         self.cur.execute('''INSERT INTO
         headDB (filename,path,author,date_create,date_change,sys_modified)
         VALUES (?,?,?,?,?,?)''',
         [unicode(x) for x in [
             note.filename, note.path, note.author,
-            note.dateCreate, note.dateChange, modifyTime
+            strftime("%Y-%m-%d",note.dateCreate),
+            strftime("%Y-%m-%d",note.dateChange),
+            modifyTime
             ]]
         )
 
-        self.cur.execute(" SELECT last_insert_rowid();")
-        print self.cur.fetchall()
+        self.cur.execute("SELECT last_insert_rowid()")
+        print self.cur.fetchone()
         
         '''for itag in note.tags:
             self.cur.execute("INSERT INTO tagDB VALUES (?, ?)",fid,itag)
