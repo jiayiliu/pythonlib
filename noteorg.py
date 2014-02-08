@@ -1,4 +1,6 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
 ## @package noteorg
 #  
 #  \brief Note Organizer the file header
@@ -26,9 +28,7 @@
 #  > "content": xxx <br>
 #  > }
 #
-#  ### Database entry
-#  
-#  *table* 
+
 
 from os.path import isfile,abspath,basename,getmtime
 import sys
@@ -50,16 +50,18 @@ sys.setdefaultencoding("UTF-8")
 class Note:
     ##
     # \brief Initialization code
+    # \param path path to the file (the last */* is needed)
     # \param filename name string of a file to load-in
     # \param fulltext if set, then create the Note from input text
     def __init__(self,path,filename,fulltext=[]):
         try:
             ## Filename of the Note
-            self.filename = filename
+            self.filename = unicode(filename)
             ## Path to Note
-            self.path = path
+            self.path = unicode(path)
             #if self.path[-1]!='/':
             #    self.path = str.append(self.path,'/')
+            
             filename = self.path+self.filename
             if len(fulltext) == 0: # create new Note from file
                 # !!! Exam file existency !!! #
@@ -67,11 +69,13 @@ class Note:
                     raise Exception("!! Fail to open %s !!"%filename)
                 # !!! initial empty content !!! #
                 ## Author of the Note 
-                self.author = "EMPTY"
+                self.author = unicode("EMPTY")
                 ## Create Date of the Note
                 self.dateCreate = None
                 ## Create Date of the Note
                 self.dateChange = None
+                ## system last modification time
+                self.modifyTime = localtime(getmtime(filename))
                 ## Tags for the Note
                 self.tags = []
                 ## Tags for the Note (Chinese)
@@ -131,8 +135,8 @@ class Note:
         # !!! insert main body !!! #
         if len(fulltext) == ii+2:
             raise Exception("!! Empty Content !!")
-        self.content = "".join(fulltext[ii+2:])
-        
+        self.content = unicode("".join(fulltext[ii+2:]))
+
     ##
     # \brief Populate the header content into Note class
     # \param name the keyword
@@ -140,7 +144,7 @@ class Note:
     def __populateHeaderObj(self,name,content):
         content = content.strip() # remove leading and trailing spaces
         if name.lower() == "author": 
-            self.author = content
+            self.author = unicode(content)
         if name.lower() == "date created":
             if content == "":
                 self.dateCreate = localtime()
@@ -162,7 +166,7 @@ class Note:
     # \param content a ;-seperated list of tags
     def __populateTagArray(self,content):
         self.tags = re.split(';+', content)
-        self.tags = [x.strip().capitalize() for x in self.tags if x]
+        self.tags = [unicode(x.strip().capitalize()) for x in self.tags if x]
         return
     
     ##
@@ -171,7 +175,7 @@ class Note:
     #  Populate the header tag array, work only for  or ";"
     def __populateTagArrayS(self,content):
         self.ctags = re.split(';+|；+', content)
-        self.ctags = [x.strip().capitalize() for x in self.ctags if x]
+        self.ctags = [unicode(x.strip().capitalize()) for x in self.ctags if x]
         return 
     ##
     # \brief return header information in one string
@@ -199,16 +203,7 @@ class Note:
             raise
             #sys.exit(1)
         return
-    ##
-    # \fn forDB()
-    # \brief return the tuple for database input
-    def forDB(self):
-        return [unicode(x) for x in [
-            self.filename, self.path, self.author,
-            self.dateCreate, self.dateChange
-            ]]
                
-
 ## 
 # \class IndexPage
 # \brief index all Note classes
@@ -222,16 +217,87 @@ class IndexPage:
 # \brief interface of database
 # \date 2014-01-20
 #
-#  headDB - store file header
-#  contentDB -store note content
-#  tagDB - store file tags
-#  ctagDB - store chinese tags
+#  head - store file header
+#  content -store note content
+#  tag - store file tags
+#  ctag - store chinese tags
 #
 #  main function:
-#     import(): import a new path into database (no file conflict checking)
-#     update(): update a path which contains files already in database
-#     getFileByTag():  get file names by tag
-#     getContent(): get file content by file name
+#
+#  + import(): import a new path into database (no file conflict checking)
+#  + update(): update a path which contains files already in database
+#  + getFileByTag():  get file names by tag
+#  + getContent(): get file content by file name
+#
+#  ### Database entry
+#  
+#  *table*
+#
+#   + head
+#
+#   --------------------------------------
+#   | Name         | Type                |
+#   |------------- |---------------------|
+#   | fid          | INTEGER PRIMARY KEY |
+#   | filename     | TEXT                |
+#   | path         | TEXT                |
+#   | author       | TEXT                |
+#   | date_create  | TEXT                |
+#   | date_change  | TEXT                |
+#   | sys_modified | TEXT                |
+#   --------------------------------------
+#
+#        UNIQUE (filename,path)
+#
+#   + content
+#
+#   ----------------------------------------------------------
+#   | Name    | Type                                         |
+#   |---------|----------------------------------------------|
+#   | fid     | INTEGER NOT NULL PRIMARY KEY REFERENCES head |
+#   | content | TEXT                                         |
+#   ----------------------------------------------------------
+#
+#   + tag
+#
+#   ----------------------------------------------------------
+#   | Name   | Type                                          |
+#   |--------|-----------------------------------------------|
+#   | tid | INTEGER NOT NULL PRIMARY KEY                     |
+#   | tag | TEXT UNIQUE                                      |
+#   ----------------------------------------------------------
+#
+#   + ctag
+#
+#   ----------------------------------------------------------
+#   | Name   | Type                                          |
+#   |--------|-----------------------------------------------|
+#   |ctid |INTEGER NOT NULL PRIMARY KEY|
+#   |ctag |TEXT UNIQUE|
+#   --------------------
+#
+#   + tf_bridge
+#
+#   ----------------------------------------------------------
+#   | Name   | Type                                          |
+#   |--------|-----------------------------------------------|
+#   | fid | INTEGER NOT NULL REFERENCES head                 |
+#   | tid | INTEGER NOT NULL REFERENCES tag                  |
+#   ----------------------------------------------------------
+#
+#        PRIMARY KEY (fid,tid)
+#
+#   + ctf_bridge
+#
+#   ----------------------------------------------------------
+#   | Name   | Type                                          |
+#   |--------|-----------------------------------------------|
+#   | fid    | INTEGER NOT NULL REFERENCES head              |
+#   | ctid   | INTEGER NOT NULL REFERENCES ctag              |
+#   ----------------------------------------------------------
+#
+#        PRIMARY KEY (fid,ctid)
+#
 class NoteDB():
     ## 
     # initialize the NoteDB class
@@ -253,6 +319,7 @@ class NoteDB():
             self.__importDB(path)
 
     ## destructor of NoteDB class
+    #
     def __del__(self):
         if hasattr( self, "conn"):
             self.conn.close()
@@ -264,48 +331,60 @@ class NoteDB():
     def __createDB(self,filename):
         self.conn = sql.connect(filename)
         c = self.conn.cursor()
-        c.execute(''' CREATE TABLE headDB
+        c.executescript(''' CREATE TABLE head
         (
         fid INTEGER PRIMARY KEY,
-        filename text,
-        path text,
-        author text,
-        date_create text,
-        date_change text,
-        sys_modified text,
+        filename TEXT,
+        path TEXT,
+        author TEXT,
+        date_create TEXT,
+        date_change TEXT,
+        sys_modified TEXT,
         UNIQUE (filename,path)
-        )
-        ''')
-        c.execute(''' CREATE TABLE tagDB
+        );
+        CREATE TABLE content
         (
-        tid INTEGER,
-        tag text,
-        UNIQUE (tid, tag)
-        )
-        ''')
-        c.execute(''' CREATE TABLE ctagDB
+        fid INTEGER NOT NULL PRIMARY KEY REFERENCES head,
+        content TEXT
+        );
+        CREATE TABLE tag
         (
-        ctid INTEGER,
-        tag text,
-        UNIQUE (ctid, tag)
+        tid INTEGER NOT NULL PRIMARY KEY,
+        tag TEXT UNIQUE
+        );
+        CREATE TABLE ctag
+        (
+        ctid INTEGER NOT NULL PRIMARY KEY,
+        ctag TEXT UNIQUE
+        );
+        CREATE TABLE tf_bridge
+        (
+        fid INTEGER NOT NULL REFERENCES head,
+        tid INTEGER NOT NULL REFERENCES tag,
+        PRIMARY KEY (fid,tid)
+        );
+        CREATE TABLE ctf_bridge
+        (
+        fid INTEGER NOT NULL REFERENCES head,
+        ctid INTEGER NOT NULL REFERENCES ctag,
+        PRIMARY KEY (fid,ctid)
         )
         ''')
+        self.conn.commit()
         self.cur = c
 
     ##
     # expend the current database by given path
     # \param path path to md files
-    # need to expend to full path
     def __importDB(self,path):
         path = abspath(path)+'/' # extend to full path
         files = glob.glob(path+"*.md")
         for ifile in files:
             try:
-                modifyTime = localtime(getmtime(ifile))
                 ifile = basename(ifile)
                 print "- Insert "+ifile
                 inote = Note(path,ifile)
-                self.__insertNote(inote,modifyTime=modifyTime)
+                self.insertNote(inote)
             except Exception as inst:
                 if (len(inst.args) == 2) and (inst.args[0]=="NoteClass"): # read-in fail
                     warning(inst.args[1])
@@ -316,48 +395,97 @@ class NoteDB():
     ##
     # insert a Note Class
     # \param note a Note Class
-    # \param modifyTime time structure of file modification time
-    """
-    self.cur.execute("SELECT FID FROM headDB WHERE filename == ? AND path == ?",
-    (unicode(note.filename),unicode(note.path)))
-    fid = self.cur.fetchall()[0][0]
-    print fid
-    """
-    def __insertNote(self,note,modifyTime=None):
-        if modifyTime is None:
-            modifyTime = localtime()
-        modifyTime = strftime("%Y-%m-%d %H:%M:%S",modifyTime)
-        
+    def insertNote(self,note):
+        # insert header
         self.cur.execute('''INSERT INTO
-        headDB (filename,path,author,date_create,date_change,sys_modified)
+        head (filename,path,author,date_create,date_change,sys_modified)
         VALUES (?,?,?,?,?,?)''',
-        [unicode(x) for x in [
-            note.filename, note.path, note.author,
-            strftime("%Y-%m-%d",note.dateCreate),
-            strftime("%Y-%m-%d",note.dateChange),
-            modifyTime
-            ]]
-        )
-
+        [note.filename, note.path, note.author,
+         strftime("%Y-%m-%d",note.dateCreate),
+         strftime("%Y-%m-%d",note.dateChange),
+         strftime("%Y-%m-%d %H:%M:%S",note.modifyTime)
+        ])
         self.cur.execute("SELECT last_insert_rowid()")
-        print self.cur.fetchone()
-        
-        '''for itag in note.tags:
-            self.cur.execute("INSERT INTO tagDB VALUES (?, ?)",fid,itag)
+        fid = self.cur.fetchone()[0]
+        # insert content
+        self.cur.execute("INSERT INTO content VALUES (?,?)",[fid,unicode(note.content)])
+        # insert tag and tf_bridge
+        for itag in note.tags:
+            self.cur.execute("INSERT INTO tag (tag) select (?) where not exists(select tid from tag where tag=?)",[itag,itag])
+            self.cur.execute("select tid from tag where tag =?",[itag]);
+            tid = self.cur.fetchone()[0]
+            self.cur.execute("INSERT INTO tf_bridge (fid,tid) VALUES (?,?)",[fid,tid])
+        # insert ctag and ctf_bridge
         for itag in note.ctags:
-            self.cur.execute("INSERT INTO ctagDB VALUES (?, ?)",fid,unicode(itag))
-        '''
+            itag = unicode(itag)
+            self.cur.execute("INSERT INTO ctag (ctag) select (?) where not exists(select ctid from ctag where ctag=?)",[itag,itag])
+            self.cur.execute("select ctid from ctag where ctag =?",[itag]);
+            tid = self.cur.fetchone()[0]
+            self.cur.execute("INSERT INTO ctf_bridge (fid,ctid) VALUES (?,?)",[fid,tid])
+            
     ##
     # update a Note Class
-    #!!!!!!!!!! Pending !!!!!!!!!!!!
-    def __updateNote(self,fid,note):
-        #self.cur.execute('''UPDATE INTO
-        #noteDB (filename,path,author,date_create,date_change,content)
-        #VALUES (?,?,?,?,?,?)''',
-        #note.forDB())
-        pass
+    # \param note Note class
+    def updateNote(self,note):
+        # examine whether note is already in the database
+        self.cur.execute("SELECT fid FROM head WHERE filename == ? AND path == ?",
+                                 [note.filename,note.path])
+        s = self.cur.fetchone()
+        if s is None: # new Note
+                warning("- Insert "+note.filename,color=33)
+                self.insertNote(note)
+        else: # Note exist
+            self.cur.execute("SELECT fid from head WHERE fid == ? AND sys_modified < ?"
+                ,[s[0],strftime("%Y-%m-%d %H:%M:%S",note.modifyTime)])
+            s = self.cur.fetchone()
+            # Note need to be updated
+            if s is not None:
+                fid = s[0]                
+                warning("- Updating "+note.filename,color=32)
+                # update head
+                self.cur.execute('''UPDATE head SET filename = ?, path = ?,
+                author = ?, date_create = ?, date_change = ?, sys_modified = ?
+                WHERE fid = ?''',
+                [ note.filename, note.path, note.author,
+                strftime("%Y-%m-%d",note.dateCreate),
+                strftime("%Y-%m-%d",note.dateChange),
+                strftime("%Y-%m-%d %H:%M:%S",note.modifyTime),
+                fid
+                ])
+                # update content
+                self.cur.execute("UPDATE content SET content = ? where fid = ?",[note.content,fid])
+                # update tags
+                pendingtags = note.tags
+                self.cur.execute("SELECT tag, tid FROM tf_bridge JOIN tag USING (tid) WHERE fid = ?",[fid])
+                tagsindb = self.cur.fetchall()
+                for itag in tagsindb:
+                    if itag[0] in pendingtags: # in tag list
+                        pendingtags.remove(itag[0])
+                    else: # remove from database
+                        self.cur.execute("DELETE FROM tf_bridge WHERE fid = ? AND tid = ?",[fid,itag[1]])
+                for itag in pendingtags: # add new tags
+                    self.cur.execute("INSERT INTO tag (tag) SELECT (?) WHERE NOT EXISTS(SELECT tid FROM tag WHERE tag=?)",[itag,itag])
+                    self.cur.execute("SELECT tid FROM tag WHERE tag =?",[itag]);
+                    tid = self.cur.fetchone()[0]
+                    self.cur.execute("INSERT INTO tf_bridge (fid,tid) VALUES (?,?)",[fid,tid])
+                # update ctags
+                pendingtags = note.ctags
+                self.cur.execute("SELECT ctag, ctid FROM ctf_bridge JOIN ctag USING (ctid) WHERE fid = ?",[fid])
+                tagsindb = self.cur.fetchall()
+                for itag in tagsindb:
+                    if itag[0] in pendingtags: # in tag list
+                        pendingtags.remove(itag[0])
+                    else: # remove from database
+                        self.cur.execute("DELETE FROM ctf_bridge WHERE fid = ? AND ctid = ?",[fid,itag[1]])
+                for itag in pendingtags: # add new tags
+                    self.cur.execute("INSERT INTO ctag (ctag) SELECT (?) WHERE NOT EXISTS(SELECT ctid FROM ctag WHERE ctag=?)",[itag,itag])
+                    self.cur.execute("SELECT ctid FROM ctag WHERE ctag =?",[itag]);
+                    tid = self.cur.fetchone()[0]
+                    self.cur.execute("INSERT INTO ctf_bridge (fid,ctid) VALUES (?,?)",[fid,tid])
+                    
     ##
-    # update the database
+    # update the database for given directory
+    # \param path path to the notes files
     def updateDB(self,path):
         path = abspath(path)+'/' # extend to full path
         files = glob.glob(path+"*.md")
@@ -365,28 +493,26 @@ class NoteDB():
             try:
                 ifile = basename(ifile)
                 inote = Note(path,ifile)
-                print inote.filename
-                self.cur.execute("SELECT FID FROM headDB WHERE filename == ? AND path == ?",
-                                    (unicode(inote.filename),unicode(inote.path)))
-                s = self.cur.fetchall()
-                if (s):
-                    fid = s[0][0]
-                    print "- Update "+ifile
-                    self.__updateNote(fid,inote)
-                else:
-                    print "- Insert "+ifile                        
-                    self.__insertNote(inote)
+                self.updateNote(inote)
             except Exception as inst:
                 if (len(inst.args) == 2) and (inst.args[0]=="NoteClass"): # read-in fail
                     warning(inst.args[1])
                 else: # other problems
-                    raise inst
+                    raise
         self.conn.commit()
+
+    ##
+    # \brief clean up to make the database tight
+    #
+    #  clean the tag/tags which are not available in bridge table anymore.
+    def cleanTag(self):
+        self.cur.execute("DELETE FROM tag WHERE tid IN ( SELECT tid from tag LEFT OUTER JOIN tf_bridge USING (tid) WHERE fid IS NULL)")
         
     ##
-    # fetch the content from DB            
+    # fetch the content from DB
+    # return a list of informations for testing          
     def fetchNoteName(self):
-        self.cur.execute("SELECT filename FROM headDB")
+        self.cur.execute("SELECT filename, ctag FROM head JOIN ctf_bridge USING (fid) JOIN ctag USING (ctid)")
         return self.cur.fetchall()
           
 ##
@@ -397,11 +523,13 @@ def main():
     #s = a.forDB()
 
     a=NoteDB("test.db")
+    a.updateDB("./")
+    a.cleanTag()
     s = a.fetchNoteName()
     for i in s:
-        print i[0]
-    a.updateDB("./")
-    
+        print i[0],i[1]
+
+        
 if __name__=="__main__":
     main()
 
