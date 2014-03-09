@@ -73,6 +73,8 @@ class GalViewer(Tk.Tk):
         self.button_clean = Tk.Button(self, text="Clean Region", state=Tk.DISABLED,
                                       command=self.controller.clean_selection)
         self.button_clean.grid(row=5, column=3)
+        self.button_save_cat = Tk.Button(self, text="Save Catalog", state=Tk.DISABLED, command=self.controller.save_reg)
+        self.button_save_cat.grid(row=5, column=5)
         # cluster information panel
         self.cluster_frame = Tk.Frame()
         self.cluster_frame.grid(row=6, columnspan=5)
@@ -110,7 +112,7 @@ class GalViewer(Tk.Tk):
             self.button_cmr[i].config(state=Tk.NORMAL)
         self.button_select_sketch.config(state=Tk.NORMAL)
         self.button_update_select.config(state=Tk.NORMAL)
-        self.button_resample.config(state=Tk.NORMAL)
+        self.button_save_cat.config(state=Tk.NORMAL)
 
     def set_cluster(self, info, method):
         """

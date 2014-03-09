@@ -56,6 +56,10 @@ PHOTOZ_PATH = config.get("Photoz", "PHOTOZ_PATH")
 PZ_pattern = config.get("Photoz", "PZ_pattern")
 
 
+########## Output Path ##########
+#: output path for
+OUTPUT_PATH = config.get("OUTPUT", "OUTPUT_PATH")
+
 ########### DS9 ##########
 def call_ds9(cid, band):
     """
@@ -66,55 +70,3 @@ def call_ds9(cid, band):
     """
     print "\033[33m ... Openning FITS file ... \033[0m"
     system("ds9.sh {0:d} {1:s}".format(cid, band))
-
-
-def create_config_file(filename):
-    """
-    Create configure file for the first time
-
-    :param filename: File to store
-    :return:
-    """
-    input_config = ConfigParser.RawConfigParser()
-    input_config.add_section("CMR")
-    input_config.set("CMR", "CMR_path", CMR_path)
-    input_config.set("CMR", "CMR_BANDS", CMR_BANDS)
-    input_config.set("CMR", "CMR_NL", CMR_NL)
-    input_config.set("CMR", "CMR_combination", CMR_combination)
-    input_config.set("CMR", "CMR_COLOR", CMR_COLOR)
-    input_config.add_section("Galaxy Catalog")
-    input_config.set("Galaxy Catalog", "CAT_PATH", CAT_PATH)
-    input_config.set("Galaxy Catalog", "CAT_PATTERN", CAT_PATTERN)
-    input_config.set("Galaxy Catalog", "CAT_BANDS", CAT_BANDS)
-    input_config.add_section("Database")
-    input_config.set("Database", "DB_FILE", DB_FILE)
-    input_config.set("Database", "P_method", P_method)
-    input_config.set("Database", "DB_CAT", DB_CAT)
-    input_config.set("Database", "DB_PZ", DB_PZ)
-    input_config.add_section("Photoz")
-    input_config.set("Photoz", "PHOTOZ_PATH", PHOTOZ_PATH)
-    input_config.set("Photoz", "PZ_pattern", PZ_pattern)
-
-    with open(filename, 'w') as f:
-        input_config.write(f)
-
-
-def valid_config_file(filename):
-    """
-    Validate the configure file
-
-    :param filename: configure file name
-    :return: Good/Bad
-    """
-    test = ConfigParser.RawConfigParser()
-    test.read(filename)
-
-    for i in test.sections():
-        print i
-        for j in test.options(i):
-            print j, "--", test.get(i, j), type(test.get(i, j))
-
-
-if __name__ == "__main__":
-    #create_config_file("photoz3.cfg")
-    valid_config_file("photoz3.cfg")

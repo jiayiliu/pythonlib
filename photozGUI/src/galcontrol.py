@@ -8,7 +8,7 @@ __author__ = 'jiayiliu'
 
 from galview import GalViewer
 from galmodel import GalModel
-from sparameter import CMR_combination, CMR_COLOR, call_ds9, P_method
+from sparameter import CMR_combination, CMR_COLOR, call_ds9, P_method, OUTPUT_PATH
 from GUItools import Message
 
 
@@ -176,6 +176,12 @@ class GalController():
                 self.model.galaxy.save_reg("clu{0:d}_{1:d}.reg".format(self.cluster_id, j),
                                            self.model.cgid[CMR_combination[j]],
                                            color=CMR_COLOR[CMR_combination[j]])
+
+    def save_cat(self):
+        """
+        save select in sketch galaxies into new cat
+        """
+        self.model.save_cat(OUTPUT_PATH+"clu{0:d}_new.cat".format(self.cluster_id))
 
     def update_selection(self):
         """

@@ -46,6 +46,14 @@ class GalModel():
         self.cluster_id = cluster_id
         self.gid = [i for i in range(len(self.galaxy.data))]
 
+    def save_cat(self, filename):
+        """
+        save into cat of selected galaxies
+        """
+        with open(filename,'w') as f:
+            for i in self.gid:
+                f.write(" ".join(["{0:f}".format(j) for j in self.galaxy.data[i]])+"\n")
+
     def get_method(self, methods):
         """
         Return the Candidate detection method for drawing radius corresponding radius
